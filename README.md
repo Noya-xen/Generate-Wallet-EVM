@@ -8,6 +8,8 @@ cara menjalankan script
 
 sebelum nya pastikan sudah mengginstall python 
 
+--=---===----
+
 sudo apt update
 
 sudo apt install python3
@@ -19,4 +21,6 @@ pip install -r requirements.txt
 python3 wallet.py
 
 
+
+-===----===-
 script di buat NOLIYADI dengan AI
