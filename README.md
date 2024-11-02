@@ -12,3 +12,6 @@ git clone https://github.com/Noya-xen/Generate-Wallet-EVM
 pip install -r requirements.txt
 
 python3 wallet.py
+
+
+script di buat NOLIYADI dengan AI
