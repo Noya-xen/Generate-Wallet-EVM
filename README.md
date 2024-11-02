@@ -4,7 +4,7 @@ jumlah wallet yang dapat di buat sesuai dengan ke inginan
 
 script wallet akan menggenerate | pharse | private key | address | yang dapat di download dengan format excel dan txt
 
-cara menjalankan script
+cara menjalankannya
 
 sebelum nya pastikan sudah mengginstall python 
 
