@@ -24,3 +24,14 @@ python3 wallet.py
 
 -===----===-
 script di buat NOLIYADI dengan AI
+
+📜 Script ini mendukung pembuatan wallet untuk jaringan:
+
+🚩 1) Ethereum 🌍
+🚩 2) Binance Smart Chain 🔶
+🚩 3) Polygon 🔺
+🚩 4) Avalanche ❄️
+🚩 5) Fantom 👻
+🚩 6) Sui 🐢
+🚩 7) Aptos 🐎
+soon jaringan lainnya
