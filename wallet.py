@@ -1,111 +1,137 @@
 import os
 import zipfile
+import datetime
 import pandas as pd
 from hdwallet import HDWallet
-from hdwallet.symbols import ETH as SYMBOL
-from eth_account import Account
-from datetime import datetime
-from mnemonic import Mnemonic
+from hdwallet.symbols import ETH
+from hdwallet.utils import generate_mnemonic
+from mnemonic import Mnemonic  # Library tambahan untuk Sui, Solana, Aptos
+from aptos_sdk.account import Account  # SDK Aptos
+from bip_utils import Bip39SeedGenerator, Bip44Coins, Bip44
+from bech32 import bech32_encode, convertbits
+from typing import List
 
-# Mapping jaringan ke BIP44 coin type
+# Daftar jaringan yang didukung dan coin types sesuai standar BIP44
 NETWORKS = {
-    "ethereum": 60,
-    "binance_smart_chain": 60,
-    "polygon": 60,
-    "avalanche": 60,
-    "fantom": 60,
+    "1": ("Ethereum", ETH, "🌍"),
+    "2": ("Binance Smart Chain", ETH, "🔶"),  # Gunakan ETH untuk BSC sebagai EVM-based
+    "3": ("Polygon", ETH, "🔺"),
+    "4": ("Avalanche", ETH, "❄️"),
+    "5": ("Fantom", ETH, "👻"),
+    "6": ("Sui", "sui", "🐢"),
+    "7": ("Aptos", "aptos", "🐎")
 }
 
-# Pilih jaringan
-network = "binance_smart_chain"  # Ganti dengan nama jaringan yang diinginkan
+class SuiWallet:
+    def __init__(self, mnemonic: str, password='') -> None:
+        self.mnemonic: str = mnemonic.strip()
+        self.password = password
+        self.pk_prefix = 'suiprivkey'
+        self.ed25519_schema = '00'
 
-# Cek apakah jaringan didukung
-if network not in NETWORKS:
-    raise ValueError(f"Jaringan '{network}' tidak didukung. Pilih dari: {', '.join(NETWORKS.keys())}")
+    def get_address_pk(self, pk_with_prefix=True):
+        seed_bytes = Bip39SeedGenerator(self.mnemonic).Generate(self.password)
+        bip44_mst_ctx = Bip44.FromSeed(seed_bytes, Bip44Coins.SUI).DeriveDefaultPath()
+        address = bip44_mst_ctx.PublicKey().ToAddress()
+        pk = bip44_mst_ctx.PrivateKey().Raw().ToHex()
 
-# Generate mnemonic phrase using the 'mnemonic' library
-mnemo = Mnemonic("english")
+        if pk_with_prefix:
+            pk_bytes_with_schema = bytes.fromhex(f'{self.ed25519_schema}{pk}')
+            pk_bit_arr = convertbits(pk_bytes_with_schema, 8, 5)
+            pk = bech32_encode(self.pk_prefix, pk_bit_arr)
 
-# Tanyakan kepada pengguna berapa banyak wallet yang ingin dihasilkan
-num_wallets = int(input("Berapa banyak wallet yang ingin dihasilkan? "))
+        return address, pk
 
-# Inisialisasi data wallet untuk DataFrame
-wallet_list = []
+def create_wallet(network_symbol):
+    """Membuat wallet untuk jaringan yang dipilih."""
+    if network_symbol == ETH:
+        hdwallet = HDWallet(symbol=network_symbol)
+        mnemonic = generate_mnemonic()
+        hdwallet.from_mnemonic(mnemonic)
+        address = hdwallet.p2pkh_address()
+        private_key = hdwallet.private_key()
 
-# Loop untuk menghasilkan beberapa wallet
-for i in range(num_wallets):
-    # Generate mnemonic phrase
-    mnemonic = mnemo.generate(strength=128)
+    elif network_symbol == "sui":
+        mnemonic = generate_mnemonic()
+        sui_wallet = SuiWallet(mnemonic)
+        address, private_key = sui_wallet.get_address_pk()
 
-    # Initialize HDWallet with generated mnemonic phrase
-    hdwallet = HDWallet(symbol=SYMBOL)
-    coin_type = NETWORKS[network]
-    hdwallet.from_mnemonic(mnemonic=mnemonic, language="english")
+    elif network_symbol == "aptos":
+        mnemonic = generate_mnemonic()
+        account = Account.generate()
+        address = str(account.address())  # Konversikan langsung ke string
+        private_key = account.private_key.hex()
 
-    # Derive key path
-    try:
-        hdwallet.from_path(f"m/44'/{coin_type}/0'/0/0")  # Gunakan coin type dari jaringan yang dipilih
-    except Exception as e:
-        print(f"Error deriving wallet: {e}")
-        continue
+    return mnemonic, private_key, address
 
-    # Extract private key
-    private_key = hdwallet.private_key()
+def main():
+    # Tampilan pengantar
+    print("════════════════════════════════════════════════════════════")
+    print("    🌐 Wallet Generator - Script oleh NOLIYADI 🌐")
+    print("════════════════════════════════════════════════════════════")
+    print("\n📜 Script ini mendukung pembuatan wallet untuk jaringan:\n")
 
-    # Generate address from private key
-    eth_account = Account.from_key(private_key)
-    address = eth_account.address
+    # Tampilkan daftar jaringan
+    for key, (network, _, icon) in NETWORKS.items():
+        print(f"🚩 {key}) {network} {icon}")
 
-    # Tambahkan data wallet ke daftar
-    wallet_list.append({
-        "No": i + 1,
-        "Mnemonic Phrase": mnemonic,
-        "Private Key": private_key,
-        "Address": address,
-    })
+    print("\n------------------------------------------------------------")
+    print("⚙️ *Langkah-langkah pembuatan wallet:*")
+    print("  1️⃣ Pilih nomor jaringan (atau beberapa jaringan dengan koma)")
+    print("     ➡️ Contoh: 1,3,6")
+    print("  2️⃣ Masukkan jumlah wallet yang ingin Anda buat untuk setiap jaringan")
+    print("\n------------------------------------------------------------")
 
-# Buat DataFrame dari data wallet
-df = pd.DataFrame(wallet_list)
+    # Input jaringan yang ingin digunakan
+    network_choice = input("🔸 Masukkan nomor jaringan pilihan Anda: ").split(',')
+    network_choice = [x.strip() for x in network_choice if x.strip() in NETWORKS]
 
-# Format tanggal untuk nama file
-current_date = datetime.now().strftime("%d-%m-%Y")
+    # Validasi pilihan jaringan
+    if not network_choice:
+        print("❌ Pilihan jaringan tidak valid. Harap coba lagi.")
+        return
 
-# Format folder untuk menyimpan data
-folder_name = f"wallets_{network}_{current_date}"
-os.makedirs(folder_name, exist_ok=True)
+    # Input jumlah wallet yang diinginkan
+    wallet_count = int(input("🔹 Masukkan jumlah wallet yang ingin Anda buat: "))
 
-# Simpan data wallet ke file teks
-wallet_file_path = os.path.join(folder_name, "wallet_info.txt")
-with open(wallet_file_path, "w") as file:
-    file.write("+----+----------------------------------+----------------------------------------------------+----------------------------------+\n")
-    file.write("| No |         Mnemonic Phrase          |                   Private Key                      |            Address                |\n")
-    file.write("+----+----------------------------------+----------------------------------------------------+----------------------------------+\n")
-    for index, row in df.iterrows():
-        file.write(f"| {row['No']:<2} | {row['Mnemonic Phrase']:<30} | {row['Private Key']:<66} | {row['Address']:<34} |\n")
-    file.write("+----+----------------------------------+----------------------------------------------------+----------------------------------+\n")
+    # Inisialisasi data wallet
+    wallet_data = []
 
-# Simpan data wallet ke file Excel
-excel_file_path = os.path.join(folder_name, "wallet_info.xlsx")
-df.to_excel(excel_file_path, index=False, engine='openpyxl')
+    print("\n🔄 Proses pembuatan wallet sedang berlangsung...\n")
 
-# Menamai file ZIP berdasarkan jumlah wallet dan tanggal
-zip_file_name = f"{num_wallets}_wallets_{current_date}.zip"
+    # Pembuatan wallet untuk setiap jaringan yang dipilih
+    for choice in network_choice:
+        network_name, network_symbol, icon = NETWORKS[choice]
+        print(f"   ➔ {network_name} {icon}")
+        
+        for i in range(wallet_count):
+            mnemonic, private_key, address = create_wallet(network_symbol)
+            wallet_data.append({
+                "No": i + 1,
+                "Network": network_name,
+                "Mnemonic Phrase": mnemonic,
+                "Private Key": private_key,
+                "Address": address
+            })
 
-# Compress the folder into a zip file for easy download
-with zipfile.ZipFile(zip_file_name, 'w') as zipf:
-    zipf.write(wallet_file_path, os.path.basename(wallet_file_path))
-    zipf.write(excel_file_path, os.path.basename(excel_file_path))
+    # Buat DataFrame dan simpan sebagai file Excel
+    df = pd.DataFrame(wallet_data)
+    today = datetime.date.today().strftime("%d-%m-%Y")
+    filename = f"{wallet_count}_wallets_{today}.xlsx"
+    df.to_excel(filename, index=False)
 
-# Clean up by removing the folder after zipping
-os.remove(wallet_file_path)
-os.remove(excel_file_path)
-os.rmdir(folder_name)
+    # Kompres file Excel ke dalam ZIP
+    zip_filename = f"{wallet_count}_wallets_{today}.zip"
+    with zipfile.ZipFile(zip_filename, 'w') as zipf:
+        zipf.write(filename)
+    os.remove(filename)
 
-# Menampilkan pesan informasi setelah script dijalankan
-print(f"{num_wallets} Wallets data for {network} saved as Excel and text files, compressed into {zip_file_name}. You can now download this file.")
-print("#############################################")
-print("#                                           #")
-print("#     SC ini di buat oleh NOLIYADI         #")
-print("#       Gunakan dengan bijak!               #")
-print("#                                           #")
-print("#############################################")
+    print("\n════════════════════════════════════════════════════════════")
+    print(f"🎉 {wallet_count} Wallets berhasil dihasilkan!")
+    print(f"💾 Data disimpan sebagai: {zip_filename}")
+    print("\n════════════════════════════════════════════════════════════")
+    print("⚠️  SC ini di buat oleh NOLIYADI. Gunakan dengan bijak! ⚠️")
+    print("════════════════════════════════════════════════════════════")
+
+if __name__ == "__main__":
+    main()
