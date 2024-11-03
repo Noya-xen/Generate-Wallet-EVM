@@ -1,5 +1,6 @@
-pandas
 hdwallet
-eth-account
 mnemonic
-openpyxl
+bip-utils
+bech32
+pandas
+aptos-sdk
